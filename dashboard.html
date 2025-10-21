@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Judge Dashboard</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f4f6fa;
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+
+    header {
+      background: #004aad;
+      color: #fff;
+      padding: 15px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+
+    header h2 { margin: 0; font-size: 20px; }
+
+    header button {
+      background: #ffffff33;
+      border: 1px solid #fff;
+      color: #fff;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    header button:hover { background: #ffffff55; }
+
+    main {
+      max-width: 960px;
+      margin: 30px auto;
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    }
+
+    select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+
+    h3 { color: #004aad; margin-top: 0; }
+
+    label { display: block; margin: 15px 0; font-weight: 500; }
+    input[type="range"] { width: 100%; accent-color: #007bff; }
+
+    .score-display {
+      display: inline-block;
+      background: #007bff;
+      color: #fff;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      line-height: 38px;
+      text-align: center;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+
+    .save-btn, .export-btn, .assign-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 12px 22px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: background 0.3s, transform 0.1s;
+    }
+    .save-btn { background: #007bff; color: #fff; }
+    .save-btn:hover { background: #005fcc; }
+    .export-btn { background: #28a745; color: #fff; float: right; }
+    .export-btn:hover { background: #1f9139; }
+    .assign-btn { background: #ff9f43; color: #fff; margin-right: 10px; }
+    .assign-btn:hover { background: #e58e36; }
+
+    .hidden { display: none; }
+
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    table, th, td { border: 1px solid #ddd; }
+    th, td { padding: 8px; text-align: left; }
+    th { background: #f1f4fa; }
+
+    .alert-scored {
+      background: #e8f9f0;
+      color: #2d7a46;
+      padding: 10px 15px;
+      border-radius: 6px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      border-left: 4px solid #28a745;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: #777;
+      font-size: 13px;
+    }
+
+    /* Compact navigator */
+    .navigator {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .navigator .nav-center {
+      display: flex;
+      gap: 8px;
+    }
+    .navigator .nav-btn {
+      border: 1px solid #ccc;
+      background: #f8f9fb;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .navigator .nav-btn:hover { background: #eef1f6; }
+    #judgeSelect { width: 100%; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2 id="welcome">Loading...</h2>
+    <div>
+      <button id="assignTab" class="assign-btn hidden" onclick="toggleAssignment()">Assign Teams</button>
+      <button onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="judgeView" class="hidden">
+      <div class="navigator">
+        <!-- Left: Team dropdown -->
+        <select id="teamSelect" aria-label="Select Team"></select>
+
+        <!-- Middle: Back / Next -->
+        <div class="nav-center">
+          <button type="button" class="nav-btn" id="prevBtn">⬅️ Back</button>
+          <button type="button" class="nav-btn" id="nextBtn">Next ➡️</button>
+        </div>
+
+        <!-- Right: Judge dropdown (shown only for Master) -->
+        <select id="judgeSelect" class="hidden" aria-label="Select Judge"></select>
+      </div>
+
+      <div id="scoringForm" class="hidden">
+        <h3>Scoring: <span id="selectedTeam"></span></h3>
+        <div id="scoredAlert" class="alert-scored hidden">✅ Already Scored</div>
+        <form id="scoreForm"></form>
+        <button type="button" class="save-btn" onclick="saveScores()">💾 Save Scores</button>
+      </div>
+    </div>
+
+    <div id="assignmentPanel" class="hidden">
+      <h3>Assign Teams to Judges</h3>
+      <div id="assignmentTable"></div>
+      <button class="save-btn" onclick="saveAssignments()">Save Assignments</button>
+    </div>
+
+    <button id="exportBtn" class="export-btn hidden" onclick="exportRankings()">⬇️ Export Team Rankings (CSV)</button>
+  </main>
+
+  <footer>© 2025 IITS Judging System</footer>
+
+  <script>
+    let currentJudgeId, currentJudgeName, isMaster;
+    let criteriaList = [], teamList = [], judgeList = [];
+
+    // Safer fetch helper (and useful logs while testing)
+    async function safeLoad(path) {
+      try {
+        const res = await fetch(path, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${path}`);
+        const text = await res.text();
+        const json = text ? JSON.parse(text) : [];
+        return json;
+      } catch (err) {
+        console.warn("Failed to load", path, err);
+        return [];
+      }
+    }
+
+    function fillTeamOptions(list) {
+      const select = document.getElementById("teamSelect");
+      select.innerHTML = "";
+      (list || []).forEach(team => {
+        const opt = document.createElement("option");
+        // NOTE: team object shape here is the JSON one (not Parse)
+        opt.value = team.team_code;
+        opt.text  = `${team.team_code} - ${team.team_name || ""}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function nextTeam(delta) {
+      const select = document.getElementById("teamSelect");
+      if (!select || select.options.length === 0) return;
+      const n = select.options.length;
+      select.selectedIndex = (select.selectedIndex + delta + n) % n;
+      select.dispatchEvent(new Event("change"));
+    }
+
+    window.onload = async function () {
+      try {
+        // ==== Auto-login fallback (local dev convenience) ====
+        const judges = await safeLoad("data/judges.json");
+        if (!Array.isArray(judges) || judges.length === 0) {
+          alert("No judges found in data/judges.json");
+          return;
+        }
+
+        let user = JSON.parse(localStorage.getItem("currentUser"));
+        if (!user || !user.judge_id) {
+          const master = judges.find(j => j.isMaster === true);
+          const pick = master || judges[0];
+          localStorage.setItem("currentUser", JSON.stringify({ judge_id: pick.judge_id }));
+          user = { judge_id: pick.judge_id };
+        }
+
+        const judge = judges.find(j => j.judge_id === user.judge_id);
+        if (!judge) {
+          alert(`Judge not found for id "${user.judge_id}". Check data/judges.json`);
+          return;
+        }
+
+        // ==== Set globals / welcome ====
+        currentJudgeId = judge.judge_id;
+        currentJudgeName = judge.judge_name || judge.judge_id;
+        isMaster = judge.isMaster === true;
+        document.getElementById("welcome").innerText = `Welcome, ${currentJudgeName}`;
+
+        // ==== Load criteria + teams ====
+        criteriaList = await safeLoad("data/criteria.json");
+        teamList = await safeLoad("data/teams.json");
+
+        // Non-master sees only their assigned teams
+        if (!isMaster) {
+          const assignments = await safeLoad("data/judgeAssignments.json");
+          const assignedCodes = (assignments || [])
+            .filter(a => a.judge_id === currentJudgeId)
+            .map(a => a.team_code);
+          teamList = (teamList || []).filter(t => assignedCodes.includes(t.team_code));
+        }
+
+        // ==== Populate team dropdown ====
+        fillTeamOptions(teamList);
+
+        // ==== Reveal main view ====
+        document.getElementById("judgeView").classList.remove("hidden");
+
+        // ==== Wire Back/Next ====
+        document.getElementById("prevBtn").addEventListener("click", () => nextTeam(-1));
+        document.getElementById("nextBtn").addEventListener("click", () => nextTeam(1));
+
+        // ==== Master-only controls ====
+        if (isMaster) {
+          document.getElementById("exportBtn").classList.remove("hidden");
+          document.getElementById("assignTab").classList.remove("hidden");
+
+          // show & populate judge dropdown
+          judgeList = judges; // already loaded
+          const judgeSelect = document.getElementById("judgeSelect");
+          judgeSelect.classList.remove("hidden");
+          judgeSelect.innerHTML = "";
+          judgeList.forEach(j => {
+            const opt = document.createElement("option");
+            opt.value = j.judge_id;
+            opt.text  = j.judge_name || j.judge_id;
+            if (j.judge_id === currentJudgeId) opt.selected = true;
+            judgeSelect.appendChild(opt);
+          });
+
+          // switch which judge you're "viewing as"
+          judgeSelect.onchange = async () => {
+            currentJudgeId = judgeSelect.value;
+
+            const allTeams = await safeLoad("data/teams.json");
+            const assignments = await safeLoad("data/judgeAssignments.json");
+            const assignedCodes = (assignments || [])
+              .filter(a => a.judge_id === currentJudgeId)
+              .map(a => a.team_code);
+
+            teamList = allTeams.filter(t => assignedCodes.includes(t.team_code));
+            fillTeamOptions(teamList);
+
+            const teamSel = document.getElementById("teamSelect");
+            if (teamSel.options.length > 0) {
+              teamSel.selectedIndex = 0;
+              loadScoringForm();
+            } else {
+              document.getElementById("scoreForm").innerHTML = "";
+              document.getElementById("scoringForm").classList.add("hidden");
+              alert("Selected judge has no assigned teams.");
+            }
+          };
+        }
+
+        // ==== Team change drives scoring form ====
+        document.getElementById("teamSelect").addEventListener("change", loadScoringForm);
+
+        // ==== Initial load: pick first team if available ====
+        const select = document.getElementById("teamSelect");
+        if (select.options.length > 0) {
+          select.selectedIndex = 0;
+          loadScoringForm();
+        } else {
+          document.getElementById("scoringForm").classList.add("hidden");
+          console.warn("No teams available to display.");
+        }
+      } catch (err) {
+        console.error("Error in auto-login window.onload:", err);
+        alert("An error occurred while loading the dashboard. See console for details.");
+      }
+    };
+
+    async function loadScoringForm() {
+      const teamCode = document.getElementById("teamSelect").value;
+      if (!teamCode) return;
+
+      document.getElementById("selectedTeam").innerText = teamCode;
+
+      // Build sliders for current criteria
+      const formHtml = (criteriaList || []).map(c => `
+        <label>
+          ${c.criteria_name} (${c.criteria_code})
+          <input type="range" min="0" max="10" step="0.5" id="score_${c.criteria_code}" value="5">
+          <span class="score-display" id="disp_${c.criteria_code}">5</span>
+        </label>
+      `).join("");
+
+      document.getElementById("scoreForm").innerHTML = formHtml;
+      document.getElementById("scoringForm").classList.remove("hidden");
+      document.getElementById("scoredAlert").classList.add("hidden");
+
+      // Wire slider displays
+      (criteriaList || []).forEach(c => {
+        const slider = document.getElementById(`score_${c.criteria_code}`);
+        const disp = document.getElementById(`disp_${c.criteria_code}`);
+        slider.oninput = () => (disp.innerText = slider.value);
+      });
+
+      // Check existing scores (localStorage) and lock if already scored
+      const scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      const existing = scores.filter(s => s.judge_id === currentJudgeId && s.team_code === teamCode);
+
+      if (existing.length > 0) {
+        document.getElementById("scoredAlert").classList.remove("hidden");
+        document.querySelectorAll("#scoreForm input[type=range]").forEach(s => s.disabled = true);
+      }
+    }
+
+    function saveScores() {
+      const teamCode = document.getElementById("teamSelect").value;
+      if (!teamCode) return;
+
+      let scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      // remove old entries for this judge/team
+      scores = scores.filter(s => !(s.judge_id === currentJudgeId && s.team_code === teamCode));
+
+      (criteriaList || []).forEach(c => {
+        const val = parseFloat(document.getElementById(`score_${c.criteria_code}`).value);
+        scores.push({
+          judge_id: currentJudgeId,
+          team_code: teamCode,
+          criteria_code: c.criteria_code,
+          score: val
+        });
+      });
+
+      localStorage.setItem("scores", JSON.stringify(scores));
+      alert("✅ Scores saved successfully!");
+      document.querySelectorAll("#scoreForm input[type=range]").forEach(s => s.disabled = true);
+      document.getElementById("scoredAlert").classList.remove("hidden");
+    }
+
+    async function toggleAssignment() {
+      const panel = document.getElementById("assignmentPanel");
+      panel.classList.toggle("hidden");
+      if (!panel.classList.contains("hidden")) loadAssignments();
+    }
+
+async function loadAssignments() {
+  // Load data
+  judgeList = await safeLoad("data/judges.json");
+  const teams = await safeLoad("data/teams.json");
+  const allAssign = await safeLoad("data/judgeAssignments.json"); // [{team_code, judge_id}, ...]
+
+  // Build compact dropdown UI inside #assignmentPanel
+  const panel = document.getElementById("assignmentPanel");
+  panel.innerHTML = `
+    <h3>Assign Teams to Judges</h3>
+    <div class="navigator" id="assignNav">
+      <select id="assignTeamSelect" aria-label="Select Team"></select>
+      <div class="nav-center">
+        <button type="button" class="nav-btn" id="assignPrev">⬅️</button>
+        <button type="button" class="nav-btn" id="assignSave">💾 Save</button>
+        <button type="button" class="nav-btn" id="assignRemove">🗑 Remove</button>
+        <button type="button" class="nav-btn" id="assignNext">➡️</button>
+      </div>
+      <select id="assignJudgeSelect" aria-label="Select Judge"></select>
+    </div>
+    <div id="assignStatus" style="margin-top:8px; color:#555; font-size:14px;"></div>
+  `;
+
+  // Populate TEAM dropdown
+  const teamSel = document.getElementById("assignTeamSelect");
+  teamSel.innerHTML = "";
+  teams.forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t.team_code;
+    opt.text  = `${t.team_code} - ${t.team_name || ""}`;
+    teamSel.appendChild(opt);
+  });
+
+  // Populate JUDGE dropdown
+  const judgeSel = document.getElementById("assignJudgeSelect");
+  judgeSel.innerHTML = "";
+  (judgeList || []).forEach(j => {
+    const opt = document.createElement("option");
+    opt.value = j.judge_id;
+    opt.text  = j.judge_name || j.judge_id;
+    judgeSel.appendChild(opt);
+  });
+
+  // Helper: read the single assigned judge for a team (if multiple exist, pick first)
+  function getAssignedJudgeId(teamCode) {
+    const matches = (allAssign || []).filter(a => a.team_code === teamCode);
+    return matches.length ? matches[0].judge_id : "";
+  }
+
+  // When team changes, reflect current assignment in judge dropdown
+  function syncJudgeToTeam() {
+    const teamCode = teamSel.value;
+    const assignedId = getAssignedJudgeId(teamCode);
+    // default: keep current selection if no assignment; else set to assigned
+    if (assignedId) judgeSel.value = assignedId;
+    document.getElementById("assignStatus").textContent =
+      assignedId ? `Currently assigned to: ${assignedId}` : "No judge assigned yet.";
+  }
+
+  // Initial selection
+  if (teamSel.options.length > 0) {
+    teamSel.selectedIndex = 0;
+    syncJudgeToTeam();
+  }
+
+  // Prev / Next navigation for teams
+  document.getElementById("assignPrev").onclick = () => {
+    const n = teamSel.options.length;
+    teamSel.selectedIndex = (teamSel.selectedIndex - 1 + n) % n;
+    syncJudgeToTeam();
+  };
+  document.getElementById("assignNext").onclick = () => {
+    const n = teamSel.options.length;
+    teamSel.selectedIndex = (teamSel.selectedIndex + 1) % n;
+    syncJudgeToTeam();
+  };
+
+  teamSel.onchange = syncJudgeToTeam;
+
+  // Save assignment: one judge per team (overwrites previous)
+  document.getElementById("assignSave").onclick = () => {
+    const teamCode = teamSel.value;
+    const judgeId  = judgeSel.value;
+    if (!teamCode || !judgeId) {
+      alert("Pick both a team and a judge first.");
+      return;
+    }
+
+    // Start from current localStorage (fallback to existing loaded list)
+    let stored = JSON.parse(localStorage.getItem("judgeAssignments") || "null");
+    if (!stored) stored = allAssign || [];
+
+    // Remove any existing assignment(s) for this team, then add one fresh mapping
+    stored = stored.filter(a => a.team_code !== teamCode);
+    stored.push({ team_code: teamCode, judge_id: judgeId });
+
+    localStorage.setItem("judgeAssignments", JSON.stringify(stored));
+    document.getElementById("assignStatus").textContent = `✅ Saved: ${teamCode} → ${judgeId}`;
+    alert(`✅ Assigned ${teamCode} to ${judgeId}`);
+  };
+
+  // Remove assignment for this team
+  document.getElementById("assignRemove").onclick = () => {
+    const teamCode = teamSel.value;
+    if (!teamCode) return;
+
+    let stored = JSON.parse(localStorage.getItem("judgeAssignments") || "null");
+    if (!stored) stored = allAssign || [];
+
+    const before = stored.length;
+    stored = stored.filter(a => a.team_code !== teamCode);
+    localStorage.setItem("judgeAssignments", JSON.stringify(stored));
+
+    document.getElementById("assignStatus").textContent =
+      before !== stored.length ? `🗑 Removed assignment for ${teamCode}` : `No assignment to remove for ${teamCode}`;
+    alert(`🗑 Assignment removed for ${teamCode}`);
+  };
+}
+
+
+function saveAssignments() {
+  // No longer used: assignments are saved via the 💾 Save button in the dropdown UI.
+  alert("Use the 💾 Save button between the dropdowns to save an assignment.");
+}
+
+
+    function exportRankings() {
+      const scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      const teamTotals = {};
+      scores.forEach(s => {
+        if (!teamTotals[s.team_code]) teamTotals[s.team_code] = 0;
+        teamTotals[s.team_code] += s.score;
+      });
+      const rankings = Object.entries(teamTotals)
+        .map(([team_code, total]) => ({ team_code, total }))
+        .sort((a, b) => b.total - a.total);
+
+      let csv = "Rank,Team Code,Total Score\n";
+      rankings.forEach((r, i) => csv += `${i + 1},${r.team_code},${r.total}\n`);
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "team_rankings.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function logout() {
+      localStorage.removeItem("currentUser");
+      window.location.href = "index.html";
+    }
+  </script>
+</body>
+</html>
