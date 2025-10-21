@@ -1,0 +1,22 @@
+[
+  {
+    "criteria_code": "C001",
+    "criteria_name": "Originality & Creativity"
+  },
+  {
+    "criteria_code": "C002",
+    "criteria_name": "Practical Usefulness"
+  },
+  {
+    "criteria_code": "C003",
+    "criteria_name": "Social Impact"
+  },
+  {
+    "criteria_code": "C004",
+    "criteria_name": "Cost Effectiveness"
+  },
+  {
+    "criteria_code": "C005",
+    "criteria_name": "Presentation"
+  }
+]

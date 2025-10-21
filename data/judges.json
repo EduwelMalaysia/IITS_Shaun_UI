@@ -1,0 +1,72 @@
+[
+  {
+    "judge_id": "J001",
+    "judge_name": "LAU SAI PING",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J002",
+    "judge_name": "ISSNU BIN DOLLAH",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J003",
+    "judge_name": "HAMKA BIN WAHAB",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J004",
+    "judge_name": "THEN KHIUN KIAW",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J005",
+    "judge_name": "SUHAILA BINTI SALLEH",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J006",
+    "judge_name": "HALISA BINTI MOHD DARUS",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J007",
+    "judge_name": "MUHAMMAD BADRUZZAMAN BIN HASSAN",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J008",
+    "judge_name": "AZURA HANIM BT MD NAZAR",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J009",
+    "judge_name": "AZAHAR BIN MALEK",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J010",
+    "judge_name": "AZHAR BIN HASBI",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J011",
+    "judge_name": "MICKY TAN CHING YEE",
+    "isMaster": false
+  },
+  {
+    "judge_id": "J012",
+    "judge_name": "YEE WENG LOKE",
+    "isMaster": false
+  },
+  {
+    "judge_id": "Warhorse51",
+    "judge_name": "SHAUN",
+    "isMaster": false
+  },
+  {
+    "judge_id": "Admin",
+    "judge_name": "ADMIN",
+    "isMaster": true    
+  }
+]
